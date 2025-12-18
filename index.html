@@ -85,18 +85,45 @@
       </div>
     </header>
 
-    <div class="toolbar">
-      <button id="reloadBtn" type="button">Перезагрузить файл</button>
-      <label>
-        <input id="showRaw" type="checkbox" />
-        Показать исходный текст
-      </label>
-    </div>
+<div class="toolbar">
+  <button id="reloadBtn" type="button">Перезагрузить файл</button>
+  <button id="downloadBtn" type="button">Скачать исходный файл</button>
+  <label>
+    <input id="showRaw" type="checkbox" />
+    Показать исходный текст
+  </label>
+</div>
+
 
     <main id="app" aria-live="polite"></main>
   </div>
 
   <script>
+    const downloadBtn = document.getElementById('downloadBtn');
+
+
+downloadBtn.addEventListener('click', async () => {
+  try {
+    const res = await fetch('./test.txt', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Не удалось загрузить файл');
+
+    const text = await res.text();
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'test.txt';
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Ошибка при скачивании test.txt');
+  }
+});
+
     const app = document.getElementById('app');
     const reloadBtn = document.getElementById('reloadBtn');
     const showRaw = document.getElementById('showRaw');
