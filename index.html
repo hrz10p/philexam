@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Philexam</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.45;
+    }
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    header {
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    h1 { margin: 0; font-size: 20px; }
+    .hint { opacity: .75; font-size: 13px; margin: 0; }
+    .card {
+      border: 1px solid rgba(127,127,127,.35);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 12px 0;
+      background: rgba(127,127,127,.06);
+    }
+    .q-title {
+      font-weight: 650;
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .answers { margin: 0; padding-left: 20px; }
+    .answers li { margin: 6px 0; }
+    .raw {
+      white-space: pre-wrap;
+      border: 1px dashed rgba(127,127,127,.35);
+      border-radius: 12px;
+      padding: 12px;
+      opacity: .85;
+      margin-top: 18px;
+    }
+    .error {
+      border: 1px solid rgba(255, 80, 80, .6);
+      background: rgba(255, 80, 80, .08);
+      padding: 12px;
+      border-radius: 12px;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 12px 0 0;
+    }
+    button {
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(127,127,127,.35);
+      background: rgba(127,127,127,.10);
+      font: inherit;
+    }
+    button:hover { background: rgba(127,127,127,.16); }
+    label { font-size: 13px; opacity: .85; display: inline-flex; gap: 8px; align-items: center; }
+    input[type="checkbox"] { transform: translateY(1px); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Просмотр теста</h1>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <button id="reloadBtn" type="button">Перезагрузить файл</button>
+      <label>
+        <input id="showRaw" type="checkbox" />
+        Показать исходный текст
+      </label>
+    </div>
+
+    <main id="app" aria-live="polite"></main>
+  </div>
+
+  <script>
+    const app = document.getElementById('app');
+    const reloadBtn = document.getElementById('reloadBtn');
+    const showRaw = document.getElementById('showRaw');
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      }[c]));
+    }
+
+    // Парсинг под твой формат:
+    // 1.Вопрос... \n a) ... \n b) ... \n ...
+    function parseTest(text) {
+      // Нормализуем переносы строк
+      const t = text.replace(/\r\n/g, '\n').trim();
+
+      // Делим по "N." в начале строки
+      // Поддерживает: "1." или "1." сразу с текстом (как у тебя: "1.Понимание ...")
+      const blocks = t.split(/\n(?=\d+\.)/g);
+
+      const questions = [];
+      for (const block of blocks) {
+        const b = block.trim();
+        if (!b) continue;
+
+        // Номер вопроса
+        const mNum = b.match(/^(\d+)\.(.*)$/s);
+        if (!mNum) continue;
+
+        const number = mNum[1];
+        const rest = (mNum[2] || '').trim();
+
+        // Варианты ответов: строки вида "a)...."
+        // Разрешаем переносы между вопросом и ответами
+        const lines = rest.split('\n').map(x => x.trim()).filter(Boolean);
+
+        const answers = [];
+        const qLines = [];
+
+        for (const line of lines) {
+          const mAns = line.match(/^([a-eа-е])\)\s*(.+)$/i);
+          if (mAns) {
+            answers.push({ key: mAns[1], text: mAns[2] });
+          } else {
+            qLines.push(line);
+          }
+        }
+
+        const questionText = qLines.join(' ').replace(/\s+/g, ' ').trim();
+
+        questions.push({
+          number,
+          question: questionText,
+          answers
+        });
+      }
+
+      return questions;
+    }
+
+    function render(questions, rawText) {
+      const parts = [];
+
+      if (!questions.length) {
+        parts.push(`
+          <div class="error">
+            Не удалось распарсить вопросы. Ниже можно включить «Показать исходный текст» и проверить формат.
+          </div>
+        `);
+      } else {
+        for (const q of questions) {
+          const answersHtml = q.answers.length
+            ? `<ol class="answers" type="a">
+                 ${q.answers.map(a => `<li>${escapeHtml(a.text)}</li>`).join('')}
+               </ol>`
+            : `<div class="hint">Варианты ответов не найдены.</div>`;
+
+          parts.push(`
+            <section class="card">
+              <div class="q-title">${escapeHtml(q.number)}. ${escapeHtml(q.question)}</div>
+              ${answersHtml}
+            </section>
+          `);
+        }
+      }
+
+      if (showRaw.checked) {
+        parts.push(`<div class="raw">${escapeHtml(rawText)}</div>`);
+      }
+
+      app.innerHTML = parts.join('');
+    }
+
+    async function loadAndRender() {
+      app.innerHTML = `<div class="hint">Загружаю test.txt…</div>`;
+
+      try {
+        const res = await fetch('./test.txt', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status} при загрузке test.txt`);
+        const text = await res.text();
+
+        const questions = parseTest(text);
+        render(questions, text);
+      } catch (err) {
+        app.innerHTML = `
+          <div class="error">
+            <div><strong>Не удалось загрузить test.txt</strong></div>
+            <div class="hint">${escapeHtml(String(err))}</div>
+            <div class="hint" style="margin-top:8px;">
+              Проверь, что <code>test.txt</code> лежит рядом с <code>index.html</code>,
+              и открой страницу через локальный сервер (не через file://).
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    reloadBtn.addEventListener('click', loadAndRender);
+    showRaw.addEventListener('change', () => loadAndRender());
+
+    loadAndRender();
+  </script>
+</body>
+</html>
