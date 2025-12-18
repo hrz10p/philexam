@@ -68,6 +68,10 @@
       background: rgba(127,127,127,.10);
       font: inherit;
     }
+    .answer-a {
+  color: #1f9d55;           /* зелёный текст */
+  font-weight: 600;
+}
     button:hover { background: rgba(127,127,127,.16); }
     label { font-size: 13px; opacity: .85; display: inline-flex; gap: 8px; align-items: center; }
     input[type="checkbox"] { transform: translateY(1px); }
@@ -166,7 +170,12 @@
         for (const q of questions) {
           const answersHtml = q.answers.length
             ? `<ol class="answers" type="a">
-                 ${q.answers.map(a => `<li>${escapeHtml(a.text)}</li>`).join('')}
+                 ${q.answers.map(a => `
+  <li class="${a.key.toLowerCase() === 'a' ? 'answer-a' : ''}">
+    ${escapeHtml(a.text)}
+  </li>
+`).join('')}
+
                </ol>`
             : `<div class="hint">Варианты ответов не найдены.</div>`;
 
